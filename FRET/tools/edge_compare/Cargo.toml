@@ -1,0 +1,17 @@
+[package]
+name = "edge_compare"
+version = "0.1.0"
+authors = [ "Alwin Berger <alwin.berger@tu-dortmund.de>" ]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+debug = true
+
+[dependencies]
+clap = { version = "3.1.1", features = ["default"] }
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+ron = "0.7" # write serialized data - including hashmaps

@@ -1,0 +1,21 @@
+[package]
+name = "input_serde"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fret = { path = "../.." }
+libafl = { path = "../../../../libafl" }
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+hashbrown =  { version = "0.14.0", features = ["serde"] } # A faster hashmap, nostd compatible
+# petgraph = { version="0.6.0", features = ["serde-1"] }
+ron = "0.7" # write serialized data - including hashmaps
+rand = "0.5"
+clap = "4.5.17"
+itertools = "0.13.0"
+either = { version = "1.13.0", features = ["serde"] }
+postcard = { version = "1.0.10", features = [
+  "alloc",
+], default-features = false } # no_std compatible serde serialization format

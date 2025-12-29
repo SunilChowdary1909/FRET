@@ -1,0 +1,328 @@
+import csv
+import os
+envvars:
+    "BENCHDIR"
+def_flags="--release --no-default-features --features std,snapshot_fast,restarting,do_hash_notify_state,do_hash_notify_value,fuzz_int,trace_job_response_times"
+benchdir=os.environ["BENCHDIR"]
+RUNTIME=int(os.environ["RUNTIME"]) if "RUNTIME" in os.environ else (3600*24)
+TARGET_SET=['feedgeneration100', 'stgwoet', 'frafl']
+TARGET_REPLICA_NUMBER=int(os.environ["TARGET_REPLICA_NUMBER"]) if "TARGET_REPLICA_NUMBER" in os.environ else 10
+RANDOM_REPLICA_NUMBER=int(os.environ["RANDOM_REPLICA_NUMBER"]) if "RANDOM_REPLICA_NUMBER" in os.environ else 1
+MULTIJOB_REPLICA_NUMBER=int(os.environ["MULTIJOB_REPLICA_NUMBER"]) if "MULTIJOB_REPLICA_NUMBER" in os.environ else 3
+
+rule build_kernels:
+    shell:
+        "bash scripts/build_all_demos.sh"
+
+rule copy_kernel:
+    input:
+        "build/{target}.elf"
+    output:
+        "{benchdir}/build/{target}.elf"
+    shell:
+        "mkdir -p {benchdir}/build && cp {input} {output}"
+
+rule rebuild_qemu:
+    shell:
+        "unset CUSTOM_QEMU_NO_BUILD CUSTOM_QEMU_NO_CONFIGURE && cargo build"
+
+rule build_tools:
+    output:
+        directory("../tools/bin")
+    shell:
+        "../tools/build.sh"
+
+rule build_default:
+    input:
+        "../Cargo.toml",
+        "../src"
+    output:
+        directory("{benchdir}/bins/target_default")
+    shell:
+        "cargo build --target-dir {output} {def_flags}"
+
+rule build_showmap:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_showmap")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_stg"
+
+rule build_random:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_random")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},feed_longest"
+
+rule build_frafl:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_frafl")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_frafl,feed_longest"
+
+rule build_afl:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_afl")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_afl"
+
+rule build_stg:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_stg")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_stg"
+
+rule build_stgwoet:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_stgwoet")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_stg_woet"
+
+rule build_stg_abbpath:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_stg_abbpath")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_stg_abbpath"
+
+rule build_stg_edge:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_stg_edge")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_stg_edge"
+
+rule build_feedgeneration1:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_feedgeneration1")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},feed_genetic,gensize_1"
+
+rule build_feedgeneration10:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_feedgeneration10")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},feed_genetic,gensize_10"
+
+rule build_feedgeneration100:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_feedgeneration100")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_genetic,gensize_100"
+
+rule build_genetic100:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_genetic100")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_genetic,mutate_stg,gensize_100"
+
+rule build_feedgeneration1000:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_feedgeneration1000")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_genetic,gensize_1000"
+
+rule build_genetic1000:
+    input:
+        "{benchdir}/bins/target_default"
+    output:
+        directory("{benchdir}/bins/target_genetic1000")
+    shell:
+        "cp -r -a --reflink=auto {input} {output} && cargo build --target-dir {output} {def_flags},config_genetic,mutate_stg,gensize_1000"
+
+rule run_bench:
+    input:
+        "{benchdir}/build/{target}.elf",
+        "{benchdir}/bins/target_{fuzzer}"
+    output:
+        multiext("{benchdir}/timedump/{fuzzer}/{target}#{num}", ".time", ".log") # , ".case"
+    run:
+        with open('target_symbols.csv') as csvfile:
+            reader = csv.DictReader(csvfile)
+            line = next((x for x in reader if x['\ufeffkernel']==wildcards.target), None)
+            if line == None:
+                return False
+            kernel=line['\ufeffkernel']
+            fuzz_main=line['main_function']
+            fuzz_input=line['input_symbol']
+            fuzz_len=line['input_size']
+            bkp=line['return_function']
+            select_task=line['select_task']
+            if wildcards.fuzzer.find('random') >= 0:
+                script="""
+                    export RUST_BACKTRACE=1
+                    mkdir -p $(dirname {output[0]})
+                    set +e
+                    echo $(pwd)/{input[1]}/release/fret -n $(pwd)/{benchdir}/timedump/{wildcards.fuzzer}/{wildcards.target}#{wildcards.num} -s {select_task} -t -a -r -g -k {input[0]} -c ./target_symbols.csv fuzz --random -t {RUNTIME} -s {wildcards.num}
+                    $(pwd)/{input[1]}/release/fret -n $(pwd)/{benchdir}/timedump/{wildcards.fuzzer}/{wildcards.target}#{wildcards.num} -s {select_task} -t -a -r -g -k {input[0]} -c ./target_symbols.csv fuzz --random -t {RUNTIME} -s {wildcards.num} > {output[1]} 2>&1
+                    exit 0
+                    """
+            else:
+                script="""
+                    export RUST_BACKTRACE=1
+                    mkdir -p $(dirname {output[0]})
+                    set +e
+                    echo $(pwd)/{input[1]}/release/fret -n $(pwd)/{benchdir}/timedump/{wildcards.fuzzer}/{wildcards.target}#{wildcards.num} -s {select_task} -t -a -r -g -k {input[0]} -c ./target_symbols.csv fuzz -t {RUNTIME} -s {wildcards.num}
+                    $(pwd)/{input[1]}/release/fret -n $(pwd)/{benchdir}/timedump/{wildcards.fuzzer}/{wildcards.target}#{wildcards.num} -s {select_task} -t -a -r -g -k {input[0]} -c ./target_symbols.csv fuzz -t {RUNTIME} -s {wildcards.num} > {output[1]} 2>&1
+                    exit 0
+                    """
+            shell(script)
+
+rule run_showmap:
+    input:
+        "{benchdir}/build/{target}.elf",
+        "{benchdir}/bins/target_showmap",
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}.case"
+    output:
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.trace.ron",
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.time",
+    run:
+        with open('target_symbols.csv') as csvfile:
+            reader = csv.DictReader(csvfile)
+            line = next((x for x in reader if x['\ufeffkernel']==wildcards.target), None)
+            if line == None:
+                return False
+            kernel=line['\ufeffkernel']
+            fuzz_main=line['main_function']
+            fuzz_input=line['input_symbol']
+            fuzz_len=line['input_size']
+            bkp=line['return_function']
+            select_task=line['select_task']
+            script="""
+                export FUZZER=$(pwd)/{input[1]}/release/fret
+                mkdir -p $(dirname {output})
+                set +e
+                echo $FUZZER -n $(pwd)/{benchdir}/timedump/{wildcards.fuzzer}/{wildcards.target}#{wildcards.num}_case -s {select_task} -t -a -r -g -k {input[0]} -c ./target_symbols.csv showmap -i {input[2]}
+                $FUZZER -n $(pwd)/{benchdir}/timedump/{wildcards.fuzzer}/{wildcards.target}#{wildcards.num}_case -s {select_task} -t -a -r -g -k {input[0]} -c ./target_symbols.csv showmap -i {input[2]}
+                exit 0
+                """
+            if wildcards.fuzzer.find('random') >= 0:
+                script="export FUZZ_RANDOM=1\n"+script
+            shell(script)
+
+rule transform_trace:
+    input:
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.trace.ron",
+        "../tools/bin"
+    output:
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.jobs.csv",
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.resp.csv",
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.abbs.csv"
+    run:
+        with open('target_symbols.csv') as csvfile:
+            reader = csv.DictReader(csvfile)
+            line = next((x for x in reader if x['\ufeffkernel']==wildcards.target), None)
+            if line == None:
+                return False
+            kernel=line['\ufeffkernel']
+            fuzz_main=line['main_function']
+            fuzz_input=line['input_symbol']
+            fuzz_len=line['input_size']
+            bkp=line['return_function']
+            select_task=line['select_task']
+            script="""
+                echo ../tools/bin/state2gantt -i {input[0]} -a {output[0]} -r {output[1]} -p {output[2]} -t {select_task}
+                ../tools/bin/state2gantt -i {input[0]} -a {output[0]} -r {output[1]} -p {output[2]} -t {select_task}
+                """
+            shell(script)
+
+rule trace2gantt:
+    input:
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.jobs.csv",
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.resp.csv",
+        "../tools/bin"
+    output:
+        "{benchdir}/timedump/{fuzzer}/{target}#{num}_case.jobs.html",
+    shell:
+        "../tools/bin/plot_gantt.r {input[0]} {input[1]} html"
+
+rule quicktest:
+    params:
+        benchdir=benchdir
+    input:
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['feedgeneration100', 'stg', 'random'], target=['polycopter'], variant=['_seq_dataflow_full'], num=range(0,int( 1 ))),
+
+rule eval_bytes:
+    params:
+        benchdir=benchdir
+    input:
+        # waters bytes
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=TARGET_SET, target=['waters'], variant=['_seq_bytes'], num=range(0,int( TARGET_REPLICA_NUMBER ))),
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['random'], target=['waters'], variant=['_seq_bytes'], num=range(0,int( RANDOM_REPLICA_NUMBER ))),
+        # polycopter full
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=TARGET_SET, target=['polycopter'], variant=['_seq_dataflow_full'], num=range(0,int( TARGET_REPLICA_NUMBER ))),
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['random'], target=['polycopter'], variant=['_seq_dataflow_full'], num=range(0,int( RANDOM_REPLICA_NUMBER ))),
+
+rule eval_int:
+    params:
+        benchdir=benchdir
+    input:
+        # waters int
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=TARGET_SET, target=['waters'], variant=['_seq_int'], num=range(0,int( TARGET_REPLICA_NUMBER ))),
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['random'], target=['waters'], variant=['_seq_int'], num=range(0,int( RANDOM_REPLICA_NUMBER ))),
+        # release int
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=TARGET_SET, target=['release'], variant=['_seq_int'], num=range(0,int( TARGET_REPLICA_NUMBER ))),
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['random'], target=['release'], variant=['_seq_int'], num=range(0,int( RANDOM_REPLICA_NUMBER ))),
+
+rule eval_full:
+    params:
+        benchdir=benchdir
+    input:
+        # waters full
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=TARGET_SET, target=['waters'], variant=['_seq_full'], num=range(0,int( TARGET_REPLICA_NUMBER ))),
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['random'], target=['waters'], variant=['_seq_full'], num=range(0,int( RANDOM_REPLICA_NUMBER ))),
+        # release full
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=TARGET_SET, target=['release'], variant=['_seq_full'], num=range(0,int( TARGET_REPLICA_NUMBER ))),
+        expand("{benchdir}/timedump/{fuzzer}/{target}{variant}#{num}.time", benchdir=benchdir, fuzzer=['random'], target=['release'], variant=['_seq_full'], num=range(0,int( RANDOM_REPLICA_NUMBER ))),
+
+rule waters_multi:
+    params:
+        benchdir=benchdir
+    input:
+        expand("{benchdir}/timedump/{fuzzer}/{target}{chain}{variant}#{num}.time", benchdir=benchdir, fuzzer=['feedgeneration100', 'stgwoet', 'frafl'], target=['waters'], chain=['Ic11','Ic12','Ic13','Ic14','Ic21','Ic22','Ic23','Ic32','Ic33'], variant=['_seq_full'], num=range(0,int( MULTIJOB_REPLICA_NUMBER ))), # 'Ic31'
+
+
+rule all_bins:
+    params:
+        benchdir=benchdir
+    input:
+        expand("{benchdir}/bins/target_{target}", benchdir=benchdir, target=TARGET_SET+['random'])
+
+rule clean:
+    shell:
+        "rm -rf {benchdir}/timedump"
+
+rule full_clean:
+    shell:
+        "rm -rf {benchdir}/bins & rm -rf {benchdir}/timedump"
+
+rule plot_benchmarks:
+    shell:
+        "bash scripts/plot_all_benchmarks.sh {benchdir}"
+
+rule plot_traces:
+    shell:
+        "bash scripts/plot_all_traces.sh {benchdir}"

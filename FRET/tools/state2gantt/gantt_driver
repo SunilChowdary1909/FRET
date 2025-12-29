@@ -1,0 +1,13 @@
+#!/bin/sh
+if [ -z "$1" ]; then exit 1; fi
+OFILE_A="$(dirname "$1")/$(basename -s .trace.ron "$1")_job.csv"
+OFILE_B="$(dirname "$1")/$(basename -s .trace.ron "$1")_instance.csv"
+OFILE_C="$(dirname "$1")/$(basename -s .trace.ron "$1")_abbs.csv"
+if [ -n "$2" ]; then
+EXTRA="-t $2"
+fi
+rm -f "$OFILE_A" "$OFILE_B"
+echo state2gantt -i $1 -a "$OFILE_A" -r "$OFILE_B" -p "$OFILE_C" $EXTRA
+state2gantt -i $1 -a "$OFILE_A" -r "$OFILE_B" -p "$OFILE_C" $EXTRA
+echo plot_gantt.r "$OFILE_A" "$OFILE_B" html
+plot_gantt.r "$OFILE_A" "$OFILE_B" html
