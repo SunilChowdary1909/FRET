@@ -1,0 +1,20 @@
+# Essentials
+git
+vim
+zsh
+rsync
+wget
+tmux
+direnv
+htop
+gdb
+ffmpeg
+# FRET
+sqlite3
+build-essential
+python3-pandas
+python3-jinja2
+python3-matplotlib
+python3-numpy
+python3-reportbug
+python3-scipy
