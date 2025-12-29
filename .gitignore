@@ -1,0 +1,10 @@
+.env
+.direnv
+.ccls-cache
+.cache
+.vscode
+qemu
+.Rhistory
+.RData
+blink
+.vagrant
