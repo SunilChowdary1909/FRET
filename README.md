@@ -2,7 +2,6 @@
 ## Structure
 * `git submodule update --init`
 * LibAFL-based fuzzer under `LibAFL/fuzzers/FRET`
-* FreeRTOS demos under `FreeRTOS/FreeRTOS/Demo/CORTEX_M3_MPS2_QEMU_GCC`
 * QEMU instrumentation under `qemu-libafl-bridge`
 ## HowTo
 ### Development environment using nix
