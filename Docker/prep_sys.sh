@@ -1,0 +1,1 @@
+podman create --memory 350g --memory-swap 351g --name basepod -p 127.0.0.1:8224:22 -v basestore:/nix/store -v /fs/scratch/alwin/containers/home:/root:z -v  /fs/scratch/alwin/FRET:/root/FRET:z localhost/ubuntu-nix-basepod:latest

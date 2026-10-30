@@ -1,0 +1,10 @@
+[submodule "LibAFL"]
+	path = LibAFL
+	url = https://github.com/SunilChowdary1909/FRET-LibAFL.git
+[submodule "qemu-libafl-bridge"]
+	path = qemu-libafl-bridge
+	url = https://github.com/SunilChowdary1909/FRET-qemu.git
+[submodule "FreeRTOS"]
+	path = FreeRTOS
+	url = https://git.cs.tu-dortmund.de/SYS-OSS/FRET-FreeRTOS.git
+	branch = wcet-demo
